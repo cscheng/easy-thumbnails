@@ -55,7 +55,6 @@ class Source(File):
 
 class Thumbnail(File):
     source = models.ForeignKey(Source, related_name='thumbnails')
-    # store thumbnail dimensions in db, much faster than reading from remote storage
     width = models.PositiveIntegerField(blank=True, null=True)
     height = models.PositiveIntegerField(blank=True, null=True)
 

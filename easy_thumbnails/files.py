@@ -228,29 +228,22 @@ class ThumbnailFile(ImageFieldFile):
             return super(ThumbnailFile, self).open(mode, *args, **kwargs)
 
     def _get_image_dimensions(self):
-        from numbers import Number
         if not hasattr(self, '_dimensions_cache'):
             thumbnail = models.Thumbnail.objects.get_file(self.storage, self.name)
-            if thumbnail:
-                width = thumbnail.width
-                height = thumbnail.height
-                # retrieve image dimensions from db if possible
-                if isinstance(width, Number) and isinstance(height, Number):
-                    self._dimensions_cache = (width, height)
-                else:
-                    # open image and get the image dimensions via PIL
-                    close = self.closed
-                    self.open()
-                    dimensions = get_image_dimensions(self, close=close)
-                    self._dimensions_cache = dimensions
-                    # store in db for future use
+            if thumbnail and thumbnail.width is not None and thumbnail.height is not None:
+                # retrieve image dimensions from db
+                self._dimensions_cache = (thumbnail.width, thumbnail.height)
+            else:
+                # get dimensions
+                close = self.closed
+                self.open()
+                dimensions = get_image_dimensions(self, close=close)
+                self._dimensions_cache = dimensions
+                if thumbnail:
+                    # save dimensions
                     thumbnail.width = dimensions[0]
                     thumbnail.height = dimensions[1]
                     thumbnail.save()
-            else:
-                close = self.closed
-                self.open()
-                self._dimensions_cache = get_image_dimensions(self, close=close)
         return self._dimensions_cache
 
 
