@@ -1,4 +1,5 @@
 from django.core.files.base import File, ContentFile
+from django.core.files.images import get_image_dimensions
 from django.core.files.storage import get_storage_class, default_storage, \
     Storage
 from django.db.models.fields.files import ImageFieldFile, FieldFile
@@ -226,6 +227,32 @@ class ThumbnailFile(ImageFieldFile):
         else:
             return super(ThumbnailFile, self).open(mode, *args, **kwargs)
 
+    def _get_image_dimensions(self):
+        from numbers import Number
+        if not hasattr(self, '_dimensions_cache'):
+            thumbnail = models.Thumbnail.objects.get_file(self.storage, self.name)
+            if thumbnail:
+                width = thumbnail.width
+                height = thumbnail.height
+                # retrieve image dimensions from db if possible
+                if isinstance(width, Number) and isinstance(height, Number):
+                    self._dimensions_cache = (width, height)
+                else:
+                    # open image and get the image dimensions via PIL
+                    close = self.closed
+                    self.open()
+                    dimensions = get_image_dimensions(self, close=close)
+                    self._dimensions_cache = dimensions
+                    # store in db for future use
+                    thumbnail.width = dimensions[0]
+                    thumbnail.height = dimensions[1]
+                    thumbnail.save()
+            else:
+                close = self.closed
+                self.open()
+                self._dimensions_cache = get_image_dimensions(self, close=close)
+        return self._dimensions_cache
+
 
 class Thumbnailer(File):
     """
@@ -380,12 +407,12 @@ class Thumbnailer(File):
         thumbnail = self.generate_thumbnail(thumbnail_options)
         if save:
             save_thumbnail(thumbnail, self.thumbnail_storage)
-            signals.thumbnail_created.send(sender=thumbnail)
             # Ensure the right thumbnail name is used based on the transparency
             # of the image.
             filename = (utils.is_transparent(thumbnail.image) and
                         transparent_name or opaque_name)
             self.get_thumbnail_cache(filename, create=True, update=True)
+            signals.thumbnail_created.send(sender=thumbnail)
 
         return thumbnail
 

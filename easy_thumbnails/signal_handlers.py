@@ -48,3 +48,18 @@ def generate_aliases_global(fieldfile, **kwargs):
     # Avoids circular import.
     from easy_thumbnails.files import generate_all_aliases
     generate_all_aliases(fieldfile, include_global=True)
+
+
+def save_thumbnail_dimensions(sender, **kwargs):
+    """
+    Save thumbnail dimensions to the thumbnail record,
+    when a new thumbnail file has been created.
+    """
+    from easy_thumbnails import models
+    thumbnail = models.Thumbnail.objects.get_file(sender.storage, sender.name)
+    thumbnail.width = sender.width
+    thumbnail.height = sender.height
+    thumbnail.save()
+
+
+signals.thumbnail_created.connect(save_thumbnail_dimensions)
